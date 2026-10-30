@@ -2,21 +2,28 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+
 <meta name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Ley de Ohm — Circuito 3D</title>
+
+<title>Ley de Ohm — Realidad aumentada</title>
 
 <style>
-  * { box-sizing: border-box; }
+  * {
+    box-sizing: border-box;
+  }
 
   body {
     margin: 0;
     background: #101b2d;
     color: white;
     font-family: Arial, sans-serif;
+    overflow: hidden;
   }
 
-  canvas { display: block; }
+  canvas {
+    display: block;
+  }
 
   #interfaz {
     position: fixed;
@@ -30,15 +37,18 @@
     left: 10px;
     right: 10px;
     max-width: 420px;
+    max-height: 40vh;
+    overflow: auto;
     padding: 12px;
     border-radius: 14px;
-    background: rgba(16,27,45,.92);
+    background: rgba(16, 27, 45, 0.92);
     pointer-events: auto;
-    max-height: 42vh;
-    overflow: auto;
   }
 
-  h1 { margin: 0 0 8px; font-size: 21px; }
+  h1 {
+    margin: 0 0 8px;
+    font-size: 21px;
+  }
 
   .fila {
     display: flex;
@@ -48,22 +58,29 @@
     margin: 8px 0;
   }
 
-  label { font-size: 14px; }
+  label {
+    font-size: 14px;
+  }
 
-  select, button {
+  select,
+  button {
     min-height: 44px;
-    font-size: 16px;
+    padding: 10px;
     border: 0;
     border-radius: 8px;
-    padding: 10px;
+    font-size: 16px;
   }
 
   button {
     background: #2774e8;
     color: white;
+    cursor: pointer;
   }
 
-  button:disabled { opacity: .5; }
+  button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
 
   #lectura {
     color: #67efb4;
@@ -71,7 +88,10 @@
     font-weight: bold;
   }
 
-  #formula { font-size: 13px; margin-top: 5px; }
+  #formula {
+    margin-top: 5px;
+    font-size: 13px;
+  }
 
   #pie {
     position: absolute;
@@ -84,51 +104,64 @@
   #mensaje {
     display: inline-block;
     max-width: 500px;
-    background: rgba(0,0,0,.8);
     padding: 11px;
     border-radius: 10px;
+    background: rgba(0, 0, 0, 0.8);
     font-size: 14px;
     white-space: pre-line;
   }
 
   #colocar {
-    pointer-events: auto;
     display: block;
     margin: 10px auto 0;
     background: #14804a;
+    pointer-events: auto;
   }
 
-  [hidden] { display: none !important; }
+  [hidden] {
+    display: none !important;
+  }
 </style>
 
 <script>
-  // También informa si falla la descarga de Three.js.
   window.addEventListener("error", function(evento) {
     const panel = document.getElementById("mensaje");
+
     if (panel && evento.message) {
       panel.textContent = "Error: " + evento.message;
     }
   });
 
-  window.addEventListener("unhandledrejection", function(evento) {
-    const panel = document.getElementById("mensaje");
-    if (panel) {
-      panel.textContent = "Error: " +
-        (evento.reason?.message || String(evento.reason));
+  window.addEventListener(
+    "unhandledrejection",
+    function(evento) {
+      const panel = document.getElementById("mensaje");
+
+      if (panel) {
+        panel.textContent =
+          "Error: " +
+          (evento.reason?.message || String(evento.reason));
+      }
     }
-  });
+  );
 </script>
 </head>
 
 <body>
 
 <div id="interfaz">
+
   <section id="panel">
     <h1>Ley de Ohm · Circuito 3D</h1>
 
     <div class="fila">
-      <button id="iniciar" disabled>Comprobando AR…</button>
-      <button id="salir" hidden>Salir de AR</button>
+      <button id="iniciar" disabled>
+        Comprobando AR…
+      </button>
+
+      <button id="salir" hidden>
+        Salir de AR
+      </button>
     </div>
 
     <div class="fila">
@@ -152,8 +185,13 @@
     </div>
 
     <div class="fila">
-      <button id="interruptor">Abrir circuito</button>
-      <button id="reubicar" hidden>Reubicar</button>
+      <button id="interruptor">
+        Abrir circuito
+      </button>
+
+      <button id="reubicar" hidden>
+        Reubicar
+      </button>
     </div>
 
     <div id="lectura" aria-live="polite"></div>
@@ -161,11 +199,15 @@
   </section>
 
   <div id="pie">
-    <div id="mensaje" role="status">Cargando circuito 3D…</div>
+    <div id="mensaje" role="status">
+      Cargando circuito 3D…
+    </div>
+
     <button id="colocar" hidden disabled>
       Buscando superficie…
     </button>
   </div>
+
 </div>
 
 <script type="module">
@@ -178,112 +220,150 @@ let sesion = null;
 let fuenteHit = null;
 let buscando = false;
 let cerrado = true;
-let corriente = .06;
+let corriente = 0.06;
 let avance = 0;
 let anterior = null;
 
 const escena = new THREE.Scene();
 
 const camara = new THREE.PerspectiveCamera(
-  55, innerWidth / innerHeight, .01, 30
+  55,
+  innerWidth / innerHeight,
+  0.01,
+  30
 );
 
-// Vista inicial de comprobación.
-camara.position.set(0, .6, .65);
-camara.lookAt(0, 0, 0);
+function configurarVistaPrevia() {
+  camara.position.set(0, 0.6, 0.65);
+  camara.lookAt(0, 0, 0);
+  camara.updateMatrix();
+  camara.updateMatrixWorld(true);
+}
+
+configurarVistaPrevia();
 
 const renderer = new THREE.WebGLRenderer({
   alpha: true,
   antialias: true
 });
 
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(
+  Math.min(window.devicePixelRatio, 2)
+);
+
 renderer.setSize(innerWidth, innerHeight);
 renderer.setClearColor(0x000000, 0);
-renderer.xr.enabled = true;
 
-// Usamos el mismo espacio para detectar y dibujar.
+renderer.xr.enabled = true;
 renderer.xr.setReferenceSpaceType("local");
 
 document.body.prepend(renderer.domElement);
 
-escena.add(new THREE.HemisphereLight(0xffffff, 0x536173, 2));
+// Iluminación del circuito.
+escena.add(
+  new THREE.HemisphereLight(
+    0xffffff,
+    0x536173,
+    2
+  )
+);
 
 const luz = new THREE.DirectionalLight(0xffffff, 2);
 luz.position.set(1, 3, 2);
 escena.add(luz);
 
-// Contenedor que se colocará sobre la mesa.
+// Contenedor que se ubicará sobre la superficie.
 const soporte = new THREE.Group();
 escena.add(soporte);
 
 const modelo = new THREE.Group();
-modelo.scale.setScalar(.12);
+modelo.scale.setScalar(0.12);
 soporte.add(modelo);
 
 function material(color) {
   return new THREE.MeshStandardMaterial({
     color,
-    roughness: .6
+    roughness: 0.6
   });
 }
 
-function caja(w,h,d,color,x,y,z,grupo=modelo) {
+function caja(
+  ancho,
+  alto,
+  fondo,
+  color,
+  x,
+  y,
+  z,
+  grupo = modelo
+) {
   const objeto = new THREE.Mesh(
-    new THREE.BoxGeometry(w,h,d),
+    new THREE.BoxGeometry(ancho, alto, fondo),
     material(color)
   );
-  objeto.position.set(x,y,z);
+
+  objeto.position.set(x, y, z);
   grupo.add(objeto);
+
   return objeto;
 }
 
-function esfera(x,y,z) {
+function esfera(x, y, z) {
   const objeto = new THREE.Mesh(
-    new THREE.SphereGeometry(.075,16,12),
+    new THREE.SphereGeometry(0.075, 16, 12),
     material(0xdddddd)
   );
-  objeto.position.set(x,y,z);
+
+  objeto.position.set(x, y, z);
   modelo.add(objeto);
 }
 
-function cable(a,b) {
+function cable(a, b) {
   const inicio = new THREE.Vector3(...a);
   const final = new THREE.Vector3(...b);
   const vector = final.clone().sub(inicio);
 
   const objeto = new THREE.Mesh(
-    new THREE.CylinderGeometry(.025,.025,vector.length(),12),
+    new THREE.CylinderGeometry(
+      0.025,
+      0.025,
+      vector.length(),
+      12
+    ),
     material(0x30c8ff)
   );
 
-  objeto.position.copy(inicio).add(final).multiplyScalar(.5);
+  objeto.position
+    .copy(inicio)
+    .add(final)
+    .multiplyScalar(0.5);
 
   objeto.quaternion.setFromUnitVectors(
-    new THREE.Vector3(0,1,0),
+    new THREE.Vector3(0, 1, 0),
     vector.normalize()
   );
 
   modelo.add(objeto);
 }
 
-function texto(contenido,x,y,z,ancho=1) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 128;
+function texto(contenido, x, y, z, ancho = 1) {
+  const lienzo = document.createElement("canvas");
+  lienzo.width = 512;
+  lienzo.height = 128;
 
-  const ctx = canvas.getContext("2d");
+  const ctx = lienzo.getContext("2d");
+
   ctx.fillStyle = "white";
   ctx.font = "bold 52px Arial";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(contenido,256,64);
+  ctx.fillText(contenido, 256, 64);
 
-  const textura = new THREE.CanvasTexture(canvas);
+  const textura = new THREE.CanvasTexture(lienzo);
   textura.colorSpace = THREE.SRGBColorSpace;
 
   const objeto = new THREE.Mesh(
-    new THREE.PlaneGeometry(ancho,ancho/4),
+    new THREE.PlaneGeometry(ancho, ancho / 4),
     new THREE.MeshBasicMaterial({
       map: textura,
       transparent: true,
@@ -292,65 +372,95 @@ function texto(contenido,x,y,z,ancho=1) {
     })
   );
 
-  objeto.rotation.x = -Math.PI/2;
-  objeto.position.set(x,y,z);
+  objeto.rotation.x = -Math.PI / 2;
+  objeto.position.set(x, y, z);
   modelo.add(objeto);
 }
 
-// Placa de unos 36 × 29 cm en AR.
-caja(3,.08,2.4,0x18283e,0,.04,0);
+// Base: aproximadamente 36 × 29 cm.
+caja(
+  3, 0.08, 2.4,
+  0x18283e,
+  0, 0.04, 0
+);
 
 // Batería.
-caja(.4,.4,.7,0x20ae71,-1.2,.3,0);
-caja(.16,.15,.08,0xf05c5c,-1.2,.25,-.39);
-caja(.16,.15,.08,0xcccccc,-1.2,.25,.39);
+caja(
+  0.4, 0.4, 0.7,
+  0x20ae71,
+  -1.2, 0.3, 0
+);
 
-texto("+",-1.2,.505,-.2,.3);
-texto("−",-1.2,.505,.2,.3);
+caja(
+  0.16, 0.15, 0.08,
+  0xf05c5c,
+  -1.2, 0.25, -0.39
+);
+
+caja(
+  0.16, 0.15, 0.08,
+  0xcccccc,
+  -1.2, 0.25, 0.39
+);
+
+texto("+", -1.2, 0.505, -0.2, 0.3);
+texto("−", -1.2, 0.505, 0.2, 0.3);
 
 // Resistencia.
-caja(.8,.28,.3,0xd8ad72,0,.25,-.9);
-texto("R",0,.395,-.9,.35);
+caja(
+  0.8, 0.28, 0.3,
+  0xd8ad72,
+  0, 0.25, -0.9
+);
 
-texto("LEY DE OHM",.15,.085,-.15,1.4);
-texto("V = I × R",.15,.085,.2,1.2);
+texto("R", 0, 0.395, -0.9, 0.35);
 
-// Cables: dejan espacio para batería, resistencia e interruptor.
-[
-  [[-1.2,.24,-.39],[-1.2,.24,-.9]],
-  [[-1.2,.24,-.9],[-.4,.24,-.9]],
-  [[.4,.24,-.9],[1.2,.24,-.9]],
-  [[1.2,.24,-.9],[1.2,.24,.9]],
-  [[1.2,.24,.9],[.35,.24,.9]],
-  [[-.35,.24,.9],[-1.2,.24,.9]],
-  [[-1.2,.24,.9],[-1.2,.24,.39]]
-].forEach(([a,b]) => cable(a,b));
+texto("LEY DE OHM", 0.15, 0.085, -0.15, 1.4);
+texto("V = I × R", 0.15, 0.085, 0.2, 1.2);
 
-// Interruptor que se abre hacia arriba.
-esfera(-.35,.24,.9);
-esfera(.35,.24,.9);
+// Cables.
+const conexiones = [
+  [[-1.2, 0.24, -0.39], [-1.2, 0.24, -0.9]],
+  [[-1.2, 0.24, -0.9], [-0.4, 0.24, -0.9]],
+  [[0.4, 0.24, -0.9], [1.2, 0.24, -0.9]],
+  [[1.2, 0.24, -0.9], [1.2, 0.24, 0.9]],
+  [[1.2, 0.24, 0.9], [0.35, 0.24, 0.9]],
+  [[-0.35, 0.24, 0.9], [-1.2, 0.24, 0.9]],
+  [[-1.2, 0.24, 0.9], [-1.2, 0.24, 0.39]]
+];
+
+conexiones.forEach(([a, b]) => cable(a, b));
+
+// Interruptor.
+esfera(-0.35, 0.24, 0.9);
+esfera(0.35, 0.24, 0.9);
 
 const brazo = new THREE.Group();
-brazo.position.set(-.35,.24,.9);
+brazo.position.set(-0.35, 0.24, 0.9);
 modelo.add(brazo);
 
-caja(.7,.07,.12,0xff9f32,.35,0,0,brazo);
+caja(
+  0.7, 0.07, 0.12,
+  0xff9f32,
+  0.35, 0, 0,
+  brazo
+);
 
-// Flechas ilustrativas de corriente convencional.
+// Recorrido de las flechas.
 const puntos = [
-  [-1.2,.55,-.39],
-  [-1.2,.55,-.9],
-  [1.2,.55,-.9],
-  [1.2,.55,.9],
-  [-1.2,.55,.9],
-  [-1.2,.55,.39]
+  [-1.2, 0.55, -0.39],
+  [-1.2, 0.55, -0.9],
+  [1.2, 0.55, -0.9],
+  [1.2, 0.55, 0.9],
+  [-1.2, 0.55, 0.9],
+  [-1.2, 0.55, 0.39]
 ].map(p => new THREE.Vector3(...p));
 
 const tramos = [];
 let longitudTotal = 0;
 
-for (let i=0; i<puntos.length-1; i++) {
-  const vector = puntos[i+1].clone().sub(puntos[i]);
+for (let i = 0; i < puntos.length - 1; i++) {
+  const vector = puntos[i + 1].clone().sub(puntos[i]);
   const longitud = vector.length();
 
   tramos.push({
@@ -364,68 +474,76 @@ for (let i=0; i<puntos.length-1; i++) {
 
 const flechas = [];
 
-for (let i=0; i<8; i++) {
+for (let i = 0; i < 8; i++) {
   const flecha = new THREE.ArrowHelper(
-    new THREE.Vector3(1,0,0),
+    new THREE.Vector3(1, 0, 0),
     new THREE.Vector3(),
-    .2,
+    0.2,
     0xffdf50,
-    .09,
-    .07
+    0.09,
+    0.07
   );
+
   modelo.add(flecha);
   flechas.push(flecha);
 }
 
-// Indicador de colocación.
+// Aro más grande: 20 cm de diámetro exterior.
 const aro = new THREE.Mesh(
-  new THREE.RingGeometry(.045,.06,40)
-    .rotateX(-Math.PI/2),
+  new THREE.RingGeometry(0.07, 0.10, 40)
+    .rotateX(-Math.PI / 2),
+
   new THREE.MeshBasicMaterial({
     color: 0x43ff98,
     side: THREE.DoubleSide,
-    depthTest: false
+    depthTest: false,
+    depthWrite: false
   })
 );
 
 aro.matrixAutoUpdate = false;
+aro.renderOrder = 999;
 aro.visible = false;
 escena.add(aro);
 
 function actualizar() {
-  const v = Number($("voltaje").value);
-  const r = Number($("resistencia").value);
+  const voltaje = Number($("voltaje").value);
+  const resistencia = Number($("resistencia").value);
 
-  corriente = cerrado ? v/r : 0;
+  corriente = cerrado
+    ? voltaje / resistencia
+    : 0;
 
   $("lectura").textContent =
-    `Corriente: ${(corriente*1000).toFixed(0)} mA`;
+    `Corriente: ${(corriente * 1000).toFixed(0)} mA`;
 
   $("formula").textContent = cerrado
-    ? `${v} V / ${r} Ω = ${corriente.toFixed(3)} A`
+    ? `${voltaje} V / ${resistencia} Ω = ` +
+      `${corriente.toFixed(3)} A`
     : "Circuito abierto · Corriente = 0 A";
 
   $("interruptor").textContent = cerrado
     ? "Abrir circuito"
     : "Cerrar circuito";
 
-  brazo.rotation.z = cerrado ? 0 : Math.PI/4;
+  brazo.rotation.z = cerrado ? 0 : Math.PI / 4;
 }
 
-$("voltaje").addEventListener("change",actualizar);
-$("resistencia").addEventListener("change",actualizar);
+$("voltaje").addEventListener("change", actualizar);
+$("resistencia").addEventListener("change", actualizar);
 
-$("interruptor").addEventListener("click",() => {
+$("interruptor").addEventListener("click", () => {
   cerrado = !cerrado;
   actualizar();
 });
 
 actualizar();
 
-// Los botones no deben generar toques dentro de la escena XR.
-$("interfaz").addEventListener("beforexrselect",evento => {
-  evento.preventDefault();
-});
+// Evitar que los controles generen acciones XR adicionales.
+$("interfaz").addEventListener(
+  "beforexrselect",
+  evento => evento.preventDefault()
+);
 
 function iniciarBusqueda() {
   buscando = true;
@@ -440,9 +558,9 @@ function iniciarBusqueda() {
     "Apunta a la mesa y mueve lentamente el teléfono.";
 }
 
-$("reubicar").addEventListener("click",iniciarBusqueda);
+$("reubicar").addEventListener("click", iniciarBusqueda);
 
-$("colocar").addEventListener("click",() => {
+$("colocar").addEventListener("click", () => {
   if (!sesion || !buscando || !aro.visible) return;
 
   aro.matrix.decompose(
@@ -451,36 +569,45 @@ $("colocar").addEventListener("click",() => {
     soporte.scale
   );
 
+  soporte.updateMatrix();
+  soporte.updateMatrixWorld(true);
   soporte.visible = true;
+
   buscando = false;
   aro.visible = false;
 
   $("colocar").hidden = true;
+
   $("mensaje").textContent =
     "Circuito colocado. Muévete lentamente para verlo en 3D.\n" +
-    "Las flechas representan corriente convencional; " +
-    "su velocidad es ilustrativa.";
+    "Flechas: corriente convencional con velocidad ilustrativa.";
 });
 
 function restaurar() {
   if (fuenteHit) {
-    try { fuenteHit.cancel(); } catch {}
+    try {
+      fuenteHit.cancel();
+    } catch {}
   }
 
   fuenteHit = null;
   sesion = null;
   buscando = false;
+  anterior = null;
   aro.visible = false;
 
   soporte.visible = true;
-  soporte.position.set(0,0,0);
+  soporte.position.set(0, 0, 0);
   soporte.quaternion.identity();
   soporte.scale.setScalar(1);
+  soporte.updateMatrix();
+  soporte.updateMatrixWorld(true);
 
-  camara.position.set(0,.6,.65);
-  camara.lookAt(0,0,0);
+  configurarVistaPrevia();
 
-  renderer.setSize(innerWidth,innerHeight);
+  camara.aspect = innerWidth / innerHeight;
+  camara.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
 
   $("iniciar").hidden = false;
   $("iniciar").disabled = false;
@@ -494,11 +621,11 @@ function restaurar() {
     "Vista previa 3D. Pulsa «Colocar en mi mesa» para iniciar AR.";
 }
 
-$("salir").addEventListener("click",async () => {
+$("salir").addEventListener("click", async () => {
   if (sesion) await sesion.end();
 });
 
-$("iniciar").addEventListener("click",async () => {
+$("iniciar").addEventListener("click", async () => {
   $("iniciar").disabled = true;
   $("mensaje").textContent = "Iniciando realidad aumentada…";
 
@@ -506,13 +633,29 @@ $("iniciar").addEventListener("click",async () => {
     const nuevaSesion = await navigator.xr.requestSession(
       "immersive-ar",
       {
-        requiredFeatures: ["hit-test","dom-overlay"],
-        domOverlay: { root: $("interfaz") }
+        requiredFeatures: ["hit-test", "dom-overlay"],
+        domOverlay: {
+          root: $("interfaz")
+        }
       }
     );
 
     sesion = nuevaSesion;
-    sesion.addEventListener("end",restaurar,{once:true});
+
+    sesion.addEventListener(
+      "end",
+      restaurar,
+      { once: true }
+    );
+
+    // CORRECCIÓN:
+    // Eliminar la posición y orientación de la vista previa
+    // antes de que WebXR controle la cámara.
+    camara.position.set(0, 0, 0);
+    camara.quaternion.identity();
+    camara.scale.set(1, 1, 1);
+    camara.updateMatrix();
+    camara.updateMatrixWorld(true);
 
     await renderer.xr.setSession(sesion);
 
@@ -528,28 +671,30 @@ $("iniciar").addEventListener("click",async () => {
 
     iniciarBusqueda();
 
-  } catch(error) {
+  } catch (error) {
     if (sesion) {
-      try { await sesion.end(); } catch {}
+      try {
+        await sesion.end();
+      } catch {}
     }
 
     restaurar();
 
     $("mensaje").textContent =
-      `No se pudo iniciar AR.\n${error.name}: ${error.message}\n` +
+      `No se pudo iniciar AR.\n` +
+      `${error.name}: ${error.message}\n` +
       "Comprueba Chrome y Servicios de Google Play para RA.";
   }
 });
 
-renderer.setAnimationLoop((tiempo,frame) => {
+renderer.setAnimationLoop((tiempo, frame) => {
   const delta = anterior === null
     ? 0
-    : Math.min((tiempo-anterior)/1000,.1);
+    : Math.min((tiempo - anterior) / 1000, 0.1);
 
   anterior = tiempo;
 
   if (frame && fuenteHit && buscando) {
-    // Este es exactamente el espacio que usa el renderizador.
     const referencia = renderer.xr.getReferenceSpace();
     const resultados = frame.getHitTestResults(fuenteHit);
 
@@ -563,74 +708,100 @@ renderer.setAnimationLoop((tiempo,frame) => {
         const matriz = new THREE.Matrix4()
           .fromArray(pose.transform.matrix);
 
-        const normal = new THREE.Vector3(0,1,0)
+        const normal = new THREE.Vector3(0, 1, 0)
           .transformDirection(matriz);
 
         // Aceptar superficies aproximadamente horizontales.
-        if (normal.y > .9) {
+        if (normal.y > 0.9) {
           poseElegida = pose;
           break;
         }
       }
     }
 
-    aro.visible = !!poseElegida;
+    aro.visible = Boolean(poseElegida);
     $("colocar").disabled = !poseElegida;
 
     if (poseElegida) {
-      aro.matrix.fromArray(poseElegida.transform.matrix);
+      aro.matrix.fromArray(
+        poseElegida.transform.matrix
+      );
 
-      $("colocar").textContent = "Colocar circuito aquí";
+      // CORRECCIÓN:
+      // Elevar el aro 1 cm sobre la superficie.
+      aro.matrix.elements[13] += 0.01;
+      aro.updateMatrixWorld(true);
+
+      $("colocar").textContent =
+        "Colocar circuito aquí";
+
       $("mensaje").textContent =
-        "Aro verde detectado. Comprueba que esté sobre la mesa.";
+        "Superficie detectada.\n" +
+        "Comprueba que veas el aro verde sobre la mesa.";
+
     } else {
-      $("colocar").textContent = "Buscando superficie…";
+      $("colocar").textContent =
+        "Buscando superficie…";
+
+      $("mensaje").textContent =
+        "Apunta a la mesa y mueve lentamente el teléfono.";
     }
   }
 
   if (cerrado) {
-    avance = (avance + corriente*6*delta) % longitudTotal;
+    avance = (
+      avance + corriente * 6 * delta
+    ) % longitudTotal;
   }
 
-  flechas.forEach((flecha,indice) => {
+  flechas.forEach((flecha, indice) => {
     flecha.visible = cerrado;
+
     if (!cerrado) return;
 
     let distancia = (
-      avance + indice*longitudTotal/flechas.length
+      avance +
+      indice * longitudTotal / flechas.length
     ) % longitudTotal;
 
     for (const tramo of tramos) {
       if (distancia <= tramo.longitud) {
-        flecha.position.copy(tramo.inicio)
-          .addScaledVector(tramo.direccion,distancia);
+        flecha.position
+          .copy(tramo.inicio)
+          .addScaledVector(
+            tramo.direccion,
+            distancia
+          );
 
         flecha.setDirection(tramo.direccion);
         break;
       }
+
       distancia -= tramo.longitud;
     }
   });
 
-  renderer.render(escena,camara);
+  renderer.render(escena, camara);
 });
 
-window.addEventListener("resize",() => {
+window.addEventListener("resize", () => {
   if (renderer.xr.isPresenting) return;
 
-  camara.aspect = innerWidth/innerHeight;
+  camara.aspect = innerWidth / innerHeight;
   camara.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight);
+  renderer.setSize(innerWidth, innerHeight);
 });
 
 async function comprobar() {
   $("mensaje").textContent =
-    "Vista previa 3D cargada. Comprobando realidad aumentada…";
+    "Vista previa 3D cargada. Comprobando AR…";
 
   if (!window.isSecureContext || !navigator.xr) {
     $("iniciar").textContent = "AR no disponible";
+
     $("mensaje").textContent =
       "Abre el enlace HTTPS en Chrome del Galaxy A15 5G.";
+
     return;
   }
 
@@ -639,16 +810,18 @@ async function comprobar() {
       await navigator.xr.isSessionSupported("immersive-ar");
 
     $("iniciar").disabled = !compatible;
+
     $("iniciar").textContent = compatible
       ? "Colocar en mi mesa"
       : "AR no disponible";
 
     $("mensaje").textContent = compatible
       ? "Vista previa 3D. Pulsa «Colocar en mi mesa» para iniciar AR."
-      : "Actualiza Chrome y Servicios de Google Play para RA, " +
-        "cierra Chrome y vuelve a intentarlo.";
+      : "Actualiza Chrome y Servicios de Google Play para RA.";
 
-  } catch(error) {
+  } catch (error) {
+    $("iniciar").textContent = "Error al comprobar AR";
+
     $("mensaje").textContent =
       "Error al comprobar AR: " + error.message;
   }
@@ -656,5 +829,6 @@ async function comprobar() {
 
 comprobar();
 </script>
+
 </body>
 </html>
