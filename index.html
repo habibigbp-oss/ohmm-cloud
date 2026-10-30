@@ -3,149 +3,137 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport"
-      content="width=device-width, initial-scale=1">
-<title>Ley de Ohm</title>
+      content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ley de Ohm — Circuito 3D</title>
 
 <style>
   * { box-sizing: border-box; }
 
   body {
     margin: 0;
-    font-family: Arial, sans-serif;
-    background: #182638;
+    background: #101b2d;
     color: white;
+    font-family: Arial, sans-serif;
   }
 
-  video {
+  canvas { display: block; }
+
+  #interfaz {
     position: fixed;
     inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    z-index: 0;
+    pointer-events: none;
   }
 
-  main {
-    position: relative;
-    z-index: 1;
-    max-width: 600px;
-    margin: auto;
+  #panel {
+    position: absolute;
+    top: max(10px, env(safe-area-inset-top));
+    left: 10px;
+    right: 10px;
+    max-width: 420px;
     padding: 12px;
-  }
-
-  .panel {
-    background: rgba(15, 28, 45, 0.93);
-    padding: 14px;
     border-radius: 14px;
-    margin-bottom: 12px;
+    background: rgba(16,27,45,.92);
+    pointer-events: auto;
+    max-height: 42vh;
+    overflow: auto;
   }
 
-  h1 {
-    font-size: 23px;
-    margin: 0 0 8px;
-  }
+  h1 { margin: 0 0 8px; font-size: 21px; }
 
-  p {
-    font-size: 14px;
-    line-height: 1.4;
+  .fila {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
     margin: 8px 0;
   }
 
-  .controles {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin: 12px 0;
-  }
-
-  label { font-size: 15px; }
+  label { font-size: 14px; }
 
   select, button {
-    padding: 10px;
-    font-size: 16px;
     min-height: 44px;
+    font-size: 16px;
+    border: 0;
     border-radius: 8px;
-    border: none;
+    padding: 10px;
   }
-
-  select { margin-left: 4px; }
 
   button {
-    background: #2875e8;
+    background: #2774e8;
     color: white;
-    cursor: pointer;
   }
 
-  #resultado {
-    font-size: 25px;
+  button:disabled { opacity: .5; }
+
+  #lectura {
+    color: #67efb4;
+    font-size: 22px;
     font-weight: bold;
-    color: #64e4a5;
   }
 
-  svg {
+  #formula { font-size: 13px; margin-top: 5px; }
+
+  #pie {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: max(18px, env(safe-area-inset-bottom));
+    text-align: center;
+  }
+
+  #mensaje {
+    display: inline-block;
+    max-width: 500px;
+    background: rgba(0,0,0,.8);
+    padding: 11px;
+    border-radius: 10px;
+    font-size: 14px;
+    white-space: pre-line;
+  }
+
+  #colocar {
+    pointer-events: auto;
     display: block;
-    width: 100%;
-    height: auto;
-    max-height: 45vh;
-    background: rgba(10, 20, 35, 0.65);
-    border-radius: 14px;
+    margin: 10px auto 0;
+    background: #14804a;
   }
 
-  .cable {
-    fill: none;
-    stroke: #79dcff;
-    stroke-width: 7;
-    stroke-linejoin: round;
-    stroke-linecap: round;
-  }
-
-  .flujo {
-    fill: none;
-    stroke: #ffe268;
-    stroke-width: 5;
-    stroke-dasharray: 7 20;
-    animation: circular 1s linear infinite;
-  }
-
-  @keyframes circular {
-    to { stroke-dashoffset: -108; }
-  }
-
-  svg text {
-    fill: white;
-    font-family: Arial, sans-serif;
-    font-size: 16px;
-    text-anchor: middle;
-  }
-
-  #estadoCamara {
-    color: #ffe268;
-  }
+  [hidden] { display: none !important; }
 </style>
+
+<script>
+  // También informa si falla la descarga de Three.js.
+  window.addEventListener("error", function(evento) {
+    const panel = document.getElementById("mensaje");
+    if (panel && evento.message) {
+      panel.textContent = "Error: " + evento.message;
+    }
+  });
+
+  window.addEventListener("unhandledrejection", function(evento) {
+    const panel = document.getElementById("mensaje");
+    if (panel) {
+      panel.textContent = "Error: " +
+        (evento.reason?.message || String(evento.reason));
+    }
+  });
+</script>
 </head>
 
 <body>
 
-<video id="video" autoplay muted playsinline></video>
+<div id="interfaz">
+  <section id="panel">
+    <h1>Ley de Ohm · Circuito 3D</h1>
 
-<main>
-  <section class="panel">
-    <h1>Ley de Ohm</h1>
+    <div class="fila">
+      <button id="iniciar" disabled>Comprobando AR…</button>
+      <button id="salir" hidden>Salir de AR</button>
+    </div>
 
-    <p>
-      Circuito ideal sobre la cámara.
-      Apunta hacia una mesa para presentar la simulación.
-    </p>
-
-    <button id="camara">Activar cámara</button>
-
-    <p id="estadoCamara" role="status">
-      Puedes probar los controles antes de activar la cámara.
-    </p>
-
-    <div class="controles">
+    <div class="fila">
       <label>
-        Voltaje:
+        Voltaje
         <select id="voltaje">
           <option value="3">3 V</option>
           <option value="6" selected>6 V</option>
@@ -154,7 +142,7 @@
       </label>
 
       <label>
-        Resistencia:
+        Resistencia
         <select id="resistencia">
           <option value="100" selected>100 Ω</option>
           <option value="200">200 Ω</option>
@@ -163,177 +151,510 @@
       </label>
     </div>
 
-    <button id="interruptor">Abrir circuito</button>
+    <div class="fila">
+      <button id="interruptor">Abrir circuito</button>
+      <button id="reubicar" hidden>Reubicar</button>
+    </div>
 
-    <p id="resultado" aria-live="polite"></p>
-    <p id="formula"></p>
+    <div id="lectura" aria-live="polite"></div>
+    <div id="formula"></div>
   </section>
 
-  <svg viewBox="0 0 500 320"
-       role="img"
-       aria-label="Circuito en serie con batería, resistencia e interruptor">
+  <div id="pie">
+    <div id="mensaje" role="status">Cargando circuito 3D…</div>
+    <button id="colocar" hidden disabled>
+      Buscando superficie…
+    </button>
+  </div>
+</div>
 
-    <!-- Cables con espacios para los componentes -->
-    <path class="cable"
-          d="M80 125 V70 H210
-             M290 70 H420 V250 H285
-             M215 250 H80 V195"/>
+<script type="module">
+import * as THREE from
+  "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 
-    <!-- Flujo ilustrativo: positivo hacia resistencia
-         y después al negativo por el exterior -->
-    <path id="flujo" class="flujo"
-          d="M80 125 V70 H420 V250 H80 V195"/>
+const $ = id => document.getElementById(id);
 
-    <!-- Batería -->
-    <rect x="52" y="125" width="56" height="70"
-          rx="7" fill="#23a875"
-          stroke="white" stroke-width="2"/>
+let sesion = null;
+let fuenteHit = null;
+let buscando = false;
+let cerrado = true;
+let corriente = .06;
+let avance = 0;
+let anterior = null;
 
-    <text x="80" y="148">+</text>
-    <text x="80" y="183">−</text>
-    <text x="80" y="220" id="textoV">6 V</text>
+const escena = new THREE.Scene();
 
-    <!-- Resistencia -->
-    <rect x="210" y="53" width="80" height="34"
-          rx="5" fill="#d6ac73"
-          stroke="white" stroke-width="2"/>
+const camara = new THREE.PerspectiveCamera(
+  55, innerWidth / innerHeight, .01, 30
+);
 
-    <text x="250" y="35" id="textoR">100 Ω</text>
-    <text x="250" y="116">Resistencia</text>
+// Vista inicial de comprobación.
+camara.position.set(0, .6, .65);
+camara.lookAt(0, 0, 0);
 
-    <!-- Interruptor -->
-    <circle cx="215" cy="250" r="7" fill="white"/>
-    <circle cx="285" cy="250" r="7" fill="white"/>
+const renderer = new THREE.WebGLRenderer({
+  alpha: true,
+  antialias: true
+});
 
-    <line id="brazo"
-          x1="215" y1="250"
-          x2="285" y2="250"
-          stroke="#ffad4b"
-          stroke-width="8"
-          stroke-linecap="round"/>
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x000000, 0);
+renderer.xr.enabled = true;
 
-    <text x="250" y="290" id="textoEstado">Cerrado</text>
+// Usamos el mismo espacio para detectar y dibujar.
+renderer.xr.setReferenceSpaceType("local");
 
-    <!-- Información central -->
-    <text x="250" y="166">I = V / R</text>
-    <text x="250" y="198" id="textoI">60 mA</text>
-  </svg>
+document.body.prepend(renderer.domElement);
 
-  <section class="panel" style="margin-top:12px">
-    <p>
-      Las líneas amarillas representan la corriente
-      convencional. Su movimiento es ilustrativo.
-    </p>
-    <p>
-      El circuito está fijo en la pantalla:
-      esta versión no detecta superficies.
-    </p>
-  </section>
-</main>
+escena.add(new THREE.HemisphereLight(0xffffff, 0x536173, 2));
 
-<script>
-  const obtener = id => document.getElementById(id);
+const luz = new THREE.DirectionalLight(0xffffff, 2);
+luz.position.set(1, 3, 2);
+escena.add(luz);
 
-  let cerrado = true;
-  let transmision = null;
+// Contenedor que se colocará sobre la mesa.
+const soporte = new THREE.Group();
+escena.add(soporte);
 
-  function actualizar() {
-    const voltaje = Number(obtener("voltaje").value);
-    const resistencia = Number(obtener("resistencia").value);
+const modelo = new THREE.Group();
+modelo.scale.setScalar(.12);
+soporte.add(modelo);
 
-    const corriente = cerrado ? voltaje / resistencia : 0;
-    const miliamperios = corriente * 1000;
+function material(color) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    roughness: .6
+  });
+}
 
-    obtener("resultado").textContent =
-      "Corriente: " + miliamperios.toFixed(0) + " mA";
+function caja(w,h,d,color,x,y,z,grupo=modelo) {
+  const objeto = new THREE.Mesh(
+    new THREE.BoxGeometry(w,h,d),
+    material(color)
+  );
+  objeto.position.set(x,y,z);
+  grupo.add(objeto);
+  return objeto;
+}
 
-    obtener("formula").textContent = cerrado
-      ? `I = ${voltaje} V / ${resistencia} Ω = ${corriente.toFixed(3)} A`
-      : "Circuito abierto: I = 0 A. La batería conserva su voltaje.";
+function esfera(x,y,z) {
+  const objeto = new THREE.Mesh(
+    new THREE.SphereGeometry(.075,16,12),
+    material(0xdddddd)
+  );
+  objeto.position.set(x,y,z);
+  modelo.add(objeto);
+}
 
-    obtener("textoV").textContent = voltaje + " V";
-    obtener("textoR").textContent = resistencia + " Ω";
-    obtener("textoI").textContent =
-      miliamperios.toFixed(0) + " mA";
+function cable(a,b) {
+  const inicio = new THREE.Vector3(...a);
+  const final = new THREE.Vector3(...b);
+  const vector = final.clone().sub(inicio);
 
-    obtener("textoEstado").textContent =
-      cerrado ? "Cerrado" : "Abierto";
+  const objeto = new THREE.Mesh(
+    new THREE.CylinderGeometry(.025,.025,vector.length(),12),
+    material(0x30c8ff)
+  );
 
-    obtener("interruptor").textContent =
-      cerrado ? "Abrir circuito" : "Cerrar circuito";
+  objeto.position.copy(inicio).add(final).multiplyScalar(.5);
 
-    obtener("brazo").setAttribute("y2", cerrado ? 250 : 210);
+  objeto.quaternion.setFromUnitVectors(
+    new THREE.Vector3(0,1,0),
+    vector.normalize()
+  );
 
-    obtener("flujo").style.display =
-      cerrado ? "block" : "none";
+  modelo.add(objeto);
+}
 
-    // Mayor corriente → animación visual más rápida.
-    obtener("flujo").style.animationDuration =
-      (0.12 / corriente).toFixed(2) + "s";
+function texto(contenido,x,y,z,ancho=1) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 128;
+
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "white";
+  ctx.font = "bold 52px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(contenido,256,64);
+
+  const textura = new THREE.CanvasTexture(canvas);
+  textura.colorSpace = THREE.SRGBColorSpace;
+
+  const objeto = new THREE.Mesh(
+    new THREE.PlaneGeometry(ancho,ancho/4),
+    new THREE.MeshBasicMaterial({
+      map: textura,
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    })
+  );
+
+  objeto.rotation.x = -Math.PI/2;
+  objeto.position.set(x,y,z);
+  modelo.add(objeto);
+}
+
+// Placa de unos 36 × 29 cm en AR.
+caja(3,.08,2.4,0x18283e,0,.04,0);
+
+// Batería.
+caja(.4,.4,.7,0x20ae71,-1.2,.3,0);
+caja(.16,.15,.08,0xf05c5c,-1.2,.25,-.39);
+caja(.16,.15,.08,0xcccccc,-1.2,.25,.39);
+
+texto("+",-1.2,.505,-.2,.3);
+texto("−",-1.2,.505,.2,.3);
+
+// Resistencia.
+caja(.8,.28,.3,0xd8ad72,0,.25,-.9);
+texto("R",0,.395,-.9,.35);
+
+texto("LEY DE OHM",.15,.085,-.15,1.4);
+texto("V = I × R",.15,.085,.2,1.2);
+
+// Cables: dejan espacio para batería, resistencia e interruptor.
+[
+  [[-1.2,.24,-.39],[-1.2,.24,-.9]],
+  [[-1.2,.24,-.9],[-.4,.24,-.9]],
+  [[.4,.24,-.9],[1.2,.24,-.9]],
+  [[1.2,.24,-.9],[1.2,.24,.9]],
+  [[1.2,.24,.9],[.35,.24,.9]],
+  [[-.35,.24,.9],[-1.2,.24,.9]],
+  [[-1.2,.24,.9],[-1.2,.24,.39]]
+].forEach(([a,b]) => cable(a,b));
+
+// Interruptor que se abre hacia arriba.
+esfera(-.35,.24,.9);
+esfera(.35,.24,.9);
+
+const brazo = new THREE.Group();
+brazo.position.set(-.35,.24,.9);
+modelo.add(brazo);
+
+caja(.7,.07,.12,0xff9f32,.35,0,0,brazo);
+
+// Flechas ilustrativas de corriente convencional.
+const puntos = [
+  [-1.2,.55,-.39],
+  [-1.2,.55,-.9],
+  [1.2,.55,-.9],
+  [1.2,.55,.9],
+  [-1.2,.55,.9],
+  [-1.2,.55,.39]
+].map(p => new THREE.Vector3(...p));
+
+const tramos = [];
+let longitudTotal = 0;
+
+for (let i=0; i<puntos.length-1; i++) {
+  const vector = puntos[i+1].clone().sub(puntos[i]);
+  const longitud = vector.length();
+
+  tramos.push({
+    inicio: puntos[i],
+    direccion: vector.normalize(),
+    longitud
+  });
+
+  longitudTotal += longitud;
+}
+
+const flechas = [];
+
+for (let i=0; i<8; i++) {
+  const flecha = new THREE.ArrowHelper(
+    new THREE.Vector3(1,0,0),
+    new THREE.Vector3(),
+    .2,
+    0xffdf50,
+    .09,
+    .07
+  );
+  modelo.add(flecha);
+  flechas.push(flecha);
+}
+
+// Indicador de colocación.
+const aro = new THREE.Mesh(
+  new THREE.RingGeometry(.045,.06,40)
+    .rotateX(-Math.PI/2),
+  new THREE.MeshBasicMaterial({
+    color: 0x43ff98,
+    side: THREE.DoubleSide,
+    depthTest: false
+  })
+);
+
+aro.matrixAutoUpdate = false;
+aro.visible = false;
+escena.add(aro);
+
+function actualizar() {
+  const v = Number($("voltaje").value);
+  const r = Number($("resistencia").value);
+
+  corriente = cerrado ? v/r : 0;
+
+  $("lectura").textContent =
+    `Corriente: ${(corriente*1000).toFixed(0)} mA`;
+
+  $("formula").textContent = cerrado
+    ? `${v} V / ${r} Ω = ${corriente.toFixed(3)} A`
+    : "Circuito abierto · Corriente = 0 A";
+
+  $("interruptor").textContent = cerrado
+    ? "Abrir circuito"
+    : "Cerrar circuito";
+
+  brazo.rotation.z = cerrado ? 0 : Math.PI/4;
+}
+
+$("voltaje").addEventListener("change",actualizar);
+$("resistencia").addEventListener("change",actualizar);
+
+$("interruptor").addEventListener("click",() => {
+  cerrado = !cerrado;
+  actualizar();
+});
+
+actualizar();
+
+// Los botones no deben generar toques dentro de la escena XR.
+$("interfaz").addEventListener("beforexrselect",evento => {
+  evento.preventDefault();
+});
+
+function iniciarBusqueda() {
+  buscando = true;
+  soporte.visible = false;
+  aro.visible = false;
+
+  $("colocar").hidden = false;
+  $("colocar").disabled = true;
+  $("colocar").textContent = "Buscando superficie…";
+
+  $("mensaje").textContent =
+    "Apunta a la mesa y mueve lentamente el teléfono.";
+}
+
+$("reubicar").addEventListener("click",iniciarBusqueda);
+
+$("colocar").addEventListener("click",() => {
+  if (!sesion || !buscando || !aro.visible) return;
+
+  aro.matrix.decompose(
+    soporte.position,
+    soporte.quaternion,
+    soporte.scale
+  );
+
+  soporte.visible = true;
+  buscando = false;
+  aro.visible = false;
+
+  $("colocar").hidden = true;
+  $("mensaje").textContent =
+    "Circuito colocado. Muévete lentamente para verlo en 3D.\n" +
+    "Las flechas representan corriente convencional; " +
+    "su velocidad es ilustrativa.";
+});
+
+function restaurar() {
+  if (fuenteHit) {
+    try { fuenteHit.cancel(); } catch {}
   }
 
-  obtener("voltaje").addEventListener("change", actualizar);
-  obtener("resistencia").addEventListener("change", actualizar);
+  fuenteHit = null;
+  sesion = null;
+  buscando = false;
+  aro.visible = false;
 
-  obtener("interruptor").addEventListener("click", () => {
-    cerrado = !cerrado;
-    actualizar();
-  });
+  soporte.visible = true;
+  soporte.position.set(0,0,0);
+  soporte.quaternion.identity();
+  soporte.scale.setScalar(1);
 
-  obtener("camara").addEventListener("click", async () => {
-    const boton = obtener("camara");
-    const mensaje = obtener("estadoCamara");
+  camara.position.set(0,.6,.65);
+  camara.lookAt(0,0,0);
 
-    if (transmision) {
-      transmision.getTracks().forEach(pista => pista.stop());
-      transmision = null;
-      obtener("video").srcObject = null;
-      boton.textContent = "Activar cámara";
-      mensaje.textContent = "Cámara desactivada.";
-      return;
-    }
+  renderer.setSize(innerWidth,innerHeight);
 
-    if (!navigator.mediaDevices?.getUserMedia) {
-      mensaje.textContent =
-        "La cámara no está disponible. Abre el enlace HTTPS en Chrome o Safari.";
-      return;
-    }
+  $("iniciar").hidden = false;
+  $("iniciar").disabled = false;
+  $("iniciar").textContent = "Colocar en mi mesa";
 
-    boton.disabled = true;
-    mensaje.textContent = "Solicitando permiso de cámara…";
+  $("salir").hidden = true;
+  $("reubicar").hidden = true;
+  $("colocar").hidden = true;
 
-    try {
-      transmision = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" }
-        },
-        audio: false
-      });
+  $("mensaje").textContent =
+    "Vista previa 3D. Pulsa «Colocar en mi mesa» para iniciar AR.";
+}
 
-      obtener("video").srcObject = transmision;
-      await obtener("video").play();
+$("salir").addEventListener("click",async () => {
+  if (sesion) await sesion.end();
+});
 
-      boton.textContent = "Desactivar cámara";
-      mensaje.textContent =
-        "Cámara activa. Apunta hacia una mesa.";
-    } catch (error) {
-      if (transmision) {
-        transmision.getTracks().forEach(pista => pista.stop());
-        transmision = null;
+$("iniciar").addEventListener("click",async () => {
+  $("iniciar").disabled = true;
+  $("mensaje").textContent = "Iniciando realidad aumentada…";
+
+  try {
+    const nuevaSesion = await navigator.xr.requestSession(
+      "immersive-ar",
+      {
+        requiredFeatures: ["hit-test","dom-overlay"],
+        domOverlay: { root: $("interfaz") }
       }
+    );
 
-      mensaje.textContent =
-        "No se pudo activar la cámara: " + error.name +
-        ". Revisa los permisos del navegador.";
+    sesion = nuevaSesion;
+    sesion.addEventListener("end",restaurar,{once:true});
 
-      boton.textContent = "Reintentar cámara";
-    } finally {
-      boton.disabled = false;
+    await renderer.xr.setSession(sesion);
+
+    const visor = await sesion.requestReferenceSpace("viewer");
+
+    fuenteHit = await sesion.requestHitTestSource({
+      space: visor
+    });
+
+    $("iniciar").hidden = true;
+    $("salir").hidden = false;
+    $("reubicar").hidden = false;
+
+    iniciarBusqueda();
+
+  } catch(error) {
+    if (sesion) {
+      try { await sesion.end(); } catch {}
+    }
+
+    restaurar();
+
+    $("mensaje").textContent =
+      `No se pudo iniciar AR.\n${error.name}: ${error.message}\n` +
+      "Comprueba Chrome y Servicios de Google Play para RA.";
+  }
+});
+
+renderer.setAnimationLoop((tiempo,frame) => {
+  const delta = anterior === null
+    ? 0
+    : Math.min((tiempo-anterior)/1000,.1);
+
+  anterior = tiempo;
+
+  if (frame && fuenteHit && buscando) {
+    // Este es exactamente el espacio que usa el renderizador.
+    const referencia = renderer.xr.getReferenceSpace();
+    const resultados = frame.getHitTestResults(fuenteHit);
+
+    let poseElegida = null;
+
+    if (referencia) {
+      for (const resultado of resultados) {
+        const pose = resultado.getPose(referencia);
+        if (!pose) continue;
+
+        const matriz = new THREE.Matrix4()
+          .fromArray(pose.transform.matrix);
+
+        const normal = new THREE.Vector3(0,1,0)
+          .transformDirection(matriz);
+
+        // Aceptar superficies aproximadamente horizontales.
+        if (normal.y > .9) {
+          poseElegida = pose;
+          break;
+        }
+      }
+    }
+
+    aro.visible = !!poseElegida;
+    $("colocar").disabled = !poseElegida;
+
+    if (poseElegida) {
+      aro.matrix.fromArray(poseElegida.transform.matrix);
+
+      $("colocar").textContent = "Colocar circuito aquí";
+      $("mensaje").textContent =
+        "Aro verde detectado. Comprueba que esté sobre la mesa.";
+    } else {
+      $("colocar").textContent = "Buscando superficie…";
+    }
+  }
+
+  if (cerrado) {
+    avance = (avance + corriente*6*delta) % longitudTotal;
+  }
+
+  flechas.forEach((flecha,indice) => {
+    flecha.visible = cerrado;
+    if (!cerrado) return;
+
+    let distancia = (
+      avance + indice*longitudTotal/flechas.length
+    ) % longitudTotal;
+
+    for (const tramo of tramos) {
+      if (distancia <= tramo.longitud) {
+        flecha.position.copy(tramo.inicio)
+          .addScaledVector(tramo.direccion,distancia);
+
+        flecha.setDirection(tramo.direccion);
+        break;
+      }
+      distancia -= tramo.longitud;
     }
   });
 
-  actualizar();
-</script>
+  renderer.render(escena,camara);
+});
 
+window.addEventListener("resize",() => {
+  if (renderer.xr.isPresenting) return;
+
+  camara.aspect = innerWidth/innerHeight;
+  camara.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+
+async function comprobar() {
+  $("mensaje").textContent =
+    "Vista previa 3D cargada. Comprobando realidad aumentada…";
+
+  if (!window.isSecureContext || !navigator.xr) {
+    $("iniciar").textContent = "AR no disponible";
+    $("mensaje").textContent =
+      "Abre el enlace HTTPS en Chrome del Galaxy A15 5G.";
+    return;
+  }
+
+  try {
+    const compatible =
+      await navigator.xr.isSessionSupported("immersive-ar");
+
+    $("iniciar").disabled = !compatible;
+    $("iniciar").textContent = compatible
+      ? "Colocar en mi mesa"
+      : "AR no disponible";
+
+    $("mensaje").textContent = compatible
+      ? "Vista previa 3D. Pulsa «Colocar en mi mesa» para iniciar AR."
+      : "Actualiza Chrome y Servicios de Google Play para RA, " +
+        "cierra Chrome y vuelve a intentarlo.";
+
+  } catch(error) {
+    $("mensaje").textContent =
+      "Error al comprobar AR: " + error.message;
+  }
+}
+
+comprobar();
+</script>
 </body>
 </html>
