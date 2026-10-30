@@ -1,239 +1,147 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
+<meta charset="UTF-8">
+<meta name="viewport"
+      content="width=device-width, initial-scale=1">
+<title>Ley de Ohm</title>
 
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1">
+<style>
+  * { box-sizing: border-box; }
 
-  <title>Ley de Ohm en realidad aumentada</title>
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #182638;
+    color: white;
+  }
 
-  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
+  video {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+  }
 
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      font-family: Arial, sans-serif;
-    }
+  main {
+    position: relative;
+    z-index: 1;
+    max-width: 600px;
+    margin: auto;
+    padding: 12px;
+  }
 
-    #panel {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      right: 10px;
-      z-index: 10;
-      max-width: 390px;
-      max-height: 44vh;
-      overflow-y: auto;
-      box-sizing: border-box;
-      padding: 14px;
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 12px;
-      color: #152238;
-      box-shadow: 0 3px 15px #0003;
-    }
+  .panel {
+    background: rgba(15, 28, 45, 0.93);
+    padding: 14px;
+    border-radius: 14px;
+    margin-bottom: 12px;
+  }
 
-    h1 {
-      margin: 0 0 8px;
-      font-size: 20px;
-    }
+  h1 {
+    font-size: 23px;
+    margin: 0 0 8px;
+  }
 
-    p {
-      margin: 7px 0;
-      font-size: 14px;
-    }
+  p {
+    font-size: 14px;
+    line-height: 1.4;
+    margin: 8px 0;
+  }
 
-    .controles {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin: 10px 0;
-    }
+  .controles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 12px 0;
+  }
 
-    label {
-      font-size: 14px;
-    }
+  label { font-size: 15px; }
 
-    select, button {
-      padding: 9px;
-      font-size: 16px;
-      border-radius: 7px;
-      border: 1px solid #aab4c1;
-    }
+  select, button {
+    padding: 10px;
+    font-size: 16px;
+    min-height: 44px;
+    border-radius: 8px;
+    border: none;
+  }
 
-    button {
-      background: #175cd3;
-      color: white;
-      cursor: pointer;
-    }
+  select { margin-left: 4px; }
 
-    #resultado {
-      font-size: 20px;
-      font-weight: bold;
-      color: #175cd3;
-    }
+  button {
+    background: #2875e8;
+    color: white;
+    cursor: pointer;
+  }
 
-    #aviso {
-      position: fixed;
-      bottom: 15px;
-      left: 10px;
-      right: 10px;
-      z-index: 10;
-      padding: 10px;
-      border-radius: 8px;
-      text-align: center;
-      color: white;
-      background: rgba(0, 0, 0, 0.75);
-      font-size: 14px;
-    }
-  </style>
+  #resultado {
+    font-size: 25px;
+    font-weight: bold;
+    color: #64e4a5;
+  }
 
-  <script>
-    // Estado inicial de la simulación.
-    const circuito = {
-      voltaje: 6,
-      resistencia: 100,
-      cerrado: true,
-      corriente: 0.06
-    };
+  svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 45vh;
+    background: rgba(10, 20, 35, 0.65);
+    border-radius: 14px;
+  }
 
-    // Componente que dibuja los cables y anima las flechas.
-    AFRAME.registerComponent("circuito-ohm", {
-      init: function () {
-        const THREE = AFRAME.THREE;
+  .cable {
+    fill: none;
+    stroke: #79dcff;
+    stroke-width: 7;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
 
-        // Recorrido: desde el positivo de la batería,
-        // por el circuito exterior, hasta el negativo.
-        this.puntos = [
-          new THREE.Vector3(-1.2, 0.16, -0.35),
-          new THREE.Vector3(-1.2, 0.16, -0.9),
-          new THREE.Vector3(1.2, 0.16, -0.9),
-          new THREE.Vector3(1.2, 0.16, 0.9),
-          new THREE.Vector3(-1.2, 0.16, 0.9),
-          new THREE.Vector3(-1.2, 0.16, 0.35)
-        ];
+  .flujo {
+    fill: none;
+    stroke: #ffe268;
+    stroke-width: 5;
+    stroke-dasharray: 7 20;
+    animation: circular 1s linear infinite;
+  }
 
-        this.tramos = [];
-        this.longitud = 0;
+  @keyframes circular {
+    to { stroke-dashoffset: -108; }
+  }
 
-        const materialCable = new THREE.LineBasicMaterial({
-          color: 0x20c4ff
-        });
+  svg text {
+    fill: white;
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    text-anchor: middle;
+  }
 
-        // Se dejan espacios para resistencia e interruptor.
-        const cables = [
-          [[-1.2, 0.16, -0.35], [-1.2, 0.16, -0.9]],
-          [[-1.2, 0.16, -0.9], [-0.4, 0.16, -0.9]],
-          [[0.4, 0.16, -0.9], [1.2, 0.16, -0.9]],
-          [[1.2, 0.16, -0.9], [1.2, 0.16, 0.9]],
-          [[1.2, 0.16, 0.9], [0.35, 0.16, 0.9]],
-          [[-0.35, 0.16, 0.9], [-1.2, 0.16, 0.9]],
-          [[-1.2, 0.16, 0.9], [-1.2, 0.16, 0.35]]
-        ];
-
-        const grupo = new THREE.Group();
-
-        cables.forEach(extremos => {
-          const puntos = extremos.map(
-            p => new THREE.Vector3(...p)
-          );
-
-          const geometria =
-            new THREE.BufferGeometry().setFromPoints(puntos);
-
-          grupo.add(new THREE.Line(geometria, materialCable));
-        });
-
-        this.el.setObject3D("cables", grupo);
-
-        // Longitud de cada tramo para mantener
-        // un avance uniforme a lo largo del recorrido.
-        for (let i = 0; i < this.puntos.length - 1; i++) {
-          const inicio = this.puntos[i];
-          const final = this.puntos[i + 1];
-          const longitud = inicio.distanceTo(final);
-
-          this.tramos.push({
-            inicio,
-            final,
-            longitud,
-            direccion: final.clone().sub(inicio).normalize()
-          });
-
-          this.longitud += longitud;
-        }
-
-        this.flechas = [];
-
-        for (let i = 0; i < 8; i++) {
-          const flecha = new THREE.ArrowHelper(
-            new THREE.Vector3(1, 0, 0),
-            new THREE.Vector3(),
-            0.18,
-            0xffdd33,
-            0.08,
-            0.06
-          );
-
-          this.el.object3D.add(flecha);
-          this.flechas.push(flecha);
-        }
-
-        this.avance = 0;
-      },
-
-      tick: function (tiempo, delta) {
-        const activa =
-          circuito.cerrado && circuito.corriente > 0;
-
-        if (activa) {
-          // Escala visual ilustrativa.
-          // No representa la velocidad real de los electrones.
-          const velocidadVisual = circuito.corriente * 6;
-
-          this.avance = (
-            this.avance + velocidadVisual * delta / 1000
-          ) % this.longitud;
-        }
-
-        this.flechas.forEach((flecha, indice) => {
-          flecha.visible = activa;
-
-          if (!activa) return;
-
-          let distancia = (
-            this.avance +
-            indice * this.longitud / this.flechas.length
-          ) % this.longitud;
-
-          for (const tramo of this.tramos) {
-            if (distancia <= tramo.longitud) {
-              flecha.position.copy(tramo.inicio);
-              flecha.position.addScaledVector(
-                tramo.direccion, distancia
-              );
-
-              // Elevar flechas sobre los componentes.
-              flecha.position.y = 0.42;
-              flecha.setDirection(tramo.direccion);
-              break;
-            }
-
-            distancia -= tramo.longitud;
-          }
-        });
-      }
-    });
-  </script>
+  #estadoCamara {
+    color: #ffe268;
+  }
+</style>
 </head>
 
 <body>
-  <div id="panel">
-    <h1>Ley de Ohm · Realidad aumentada</h1>
 
-    <p>Apunta la cámara al marcador Hiro.</p>
+<video id="video" autoplay muted playsinline></video>
+
+<main>
+  <section class="panel">
+    <h1>Ley de Ohm</h1>
+
+    <p>
+      Circuito ideal sobre la cámara.
+      Apunta hacia una mesa para presentar la simulación.
+    </p>
+
+    <button id="camara">Activar cámara</button>
+
+    <p id="estadoCamara" role="status">
+      Puedes probar los controles antes de activar la cámara.
+    </p>
 
     <div class="controles">
       <label>
@@ -255,42 +163,177 @@
       </label>
     </div>
 
-    <button id="interruptor" type="button">
-      Abrir circuito
-    </button>
+    <button id="interruptor">Abrir circuito</button>
 
-    <p id="estado">Circuito cerrado</p>
+    <p id="resultado" aria-live="polite"></p>
+    <p id="formula"></p>
+  </section>
 
-    <p id="resultado" aria-live="polite">I = 60 mA</p>
+  <svg viewBox="0 0 500 320"
+       role="img"
+       aria-label="Circuito en serie con batería, resistencia e interruptor">
 
-    <p id="operacion">I = 6 V / 100 Ω = 0.060 A</p>
+    <!-- Cables con espacios para los componentes -->
+    <path class="cable"
+          d="M80 125 V70 H210
+             M290 70 H420 V250 H285
+             M215 250 H80 V195"/>
 
+    <!-- Flujo ilustrativo: positivo hacia resistencia
+         y después al negativo por el exterior -->
+    <path id="flujo" class="flujo"
+          d="M80 125 V70 H420 V250 H80 V195"/>
+
+    <!-- Batería -->
+    <rect x="52" y="125" width="56" height="70"
+          rx="7" fill="#23a875"
+          stroke="white" stroke-width="2"/>
+
+    <text x="80" y="148">+</text>
+    <text x="80" y="183">−</text>
+    <text x="80" y="220" id="textoV">6 V</text>
+
+    <!-- Resistencia -->
+    <rect x="210" y="53" width="80" height="34"
+          rx="5" fill="#d6ac73"
+          stroke="white" stroke-width="2"/>
+
+    <text x="250" y="35" id="textoR">100 Ω</text>
+    <text x="250" y="116">Resistencia</text>
+
+    <!-- Interruptor -->
+    <circle cx="215" cy="250" r="7" fill="white"/>
+    <circle cx="285" cy="250" r="7" fill="white"/>
+
+    <line id="brazo"
+          x1="215" y1="250"
+          x2="285" y2="250"
+          stroke="#ffad4b"
+          stroke-width="8"
+          stroke-linecap="round"/>
+
+    <text x="250" y="290" id="textoEstado">Cerrado</text>
+
+    <!-- Información central -->
+    <text x="250" y="166">I = V / R</text>
+    <text x="250" y="198" id="textoI">60 mA</text>
+  </svg>
+
+  <section class="panel" style="margin-top:12px">
     <p>
-      Modelo ideal. Flechas amarillas:
-      corriente convencional, del + al −
-      por el circuito exterior.
+      Las líneas amarillas representan la corriente
+      convencional. Su movimiento es ilustrativo.
     </p>
-  </div>
+    <p>
+      El circuito está fijo en la pantalla:
+      esta versión no detecta superficies.
+    </p>
+  </section>
+</main>
 
-  <div id="aviso" role="status">
-    Buscando marcador Hiro…
-  </div>
+<script>
+  const obtener = id => document.getElementById(id);
 
-  <a-scene
-    embedded
-    vr-mode-ui="enabled: false"
-    renderer="antialias: true; alpha: true"
-    arjs="sourceType: webcam; debugUIEnabled: false;">
+  let cerrado = true;
+  let transmision = null;
 
-    <a-marker id="marcador" preset="hiro">
+  function actualizar() {
+    const voltaje = Number(obtener("voltaje").value);
+    const resistencia = Number(obtener("resistencia").value);
 
-      <a-entity scale="0.85 0.85 0.85">
+    const corriente = cerrado ? voltaje / resistencia : 0;
+    const miliamperios = corriente * 1000;
 
-        <!-- Base del circuito -->
-        <a-box
-          position="0 -0.04 0"
-          width="2.9"
-          height="0.08"
-          depth="2.4"
-          color="#152238">
-        </
+    obtener("resultado").textContent =
+      "Corriente: " + miliamperios.toFixed(0) + " mA";
+
+    obtener("formula").textContent = cerrado
+      ? `I = ${voltaje} V / ${resistencia} Ω = ${corriente.toFixed(3)} A`
+      : "Circuito abierto: I = 0 A. La batería conserva su voltaje.";
+
+    obtener("textoV").textContent = voltaje + " V";
+    obtener("textoR").textContent = resistencia + " Ω";
+    obtener("textoI").textContent =
+      miliamperios.toFixed(0) + " mA";
+
+    obtener("textoEstado").textContent =
+      cerrado ? "Cerrado" : "Abierto";
+
+    obtener("interruptor").textContent =
+      cerrado ? "Abrir circuito" : "Cerrar circuito";
+
+    obtener("brazo").setAttribute("y2", cerrado ? 250 : 210);
+
+    obtener("flujo").style.display =
+      cerrado ? "block" : "none";
+
+    // Mayor corriente → animación visual más rápida.
+    obtener("flujo").style.animationDuration =
+      (0.12 / corriente).toFixed(2) + "s";
+  }
+
+  obtener("voltaje").addEventListener("change", actualizar);
+  obtener("resistencia").addEventListener("change", actualizar);
+
+  obtener("interruptor").addEventListener("click", () => {
+    cerrado = !cerrado;
+    actualizar();
+  });
+
+  obtener("camara").addEventListener("click", async () => {
+    const boton = obtener("camara");
+    const mensaje = obtener("estadoCamara");
+
+    if (transmision) {
+      transmision.getTracks().forEach(pista => pista.stop());
+      transmision = null;
+      obtener("video").srcObject = null;
+      boton.textContent = "Activar cámara";
+      mensaje.textContent = "Cámara desactivada.";
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      mensaje.textContent =
+        "La cámara no está disponible. Abre el enlace HTTPS en Chrome o Safari.";
+      return;
+    }
+
+    boton.disabled = true;
+    mensaje.textContent = "Solicitando permiso de cámara…";
+
+    try {
+      transmision = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" }
+        },
+        audio: false
+      });
+
+      obtener("video").srcObject = transmision;
+      await obtener("video").play();
+
+      boton.textContent = "Desactivar cámara";
+      mensaje.textContent =
+        "Cámara activa. Apunta hacia una mesa.";
+    } catch (error) {
+      if (transmision) {
+        transmision.getTracks().forEach(pista => pista.stop());
+        transmision = null;
+      }
+
+      mensaje.textContent =
+        "No se pudo activar la cámara: " + error.name +
+        ". Revisa los permisos del navegador.";
+
+      boton.textContent = "Reintentar cámara";
+    } finally {
+      boton.disabled = false;
+    }
+  });
+
+  actualizar();
+</script>
+
+</body>
+</html>
